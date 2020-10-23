@@ -1,0 +1,181 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Azure.ServiceBus;
+using Moq;
+using Xunit;
+
+namespace NLog.ServiceBus.Tests
+{
+    public abstract class ServiceBusTargetBaseTests<T>
+        where T : ServiceBusTargetBase
+    {
+        protected ServiceBusTargetBaseTests()
+        {
+            MockSenderService = new Mock<ISenderService>();
+        }
+
+        public Mock<ISenderService> MockSenderService { get; }
+
+        [Fact]
+        public void SendsLogEventAsMessage()
+        {
+            var expectedByteArray = Encoding.UTF8.GetBytes("Hello World");
+
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(
+                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => Enumerable.SequenceEqual(o.Body, expectedByteArray)))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.Layout = "${message}";
+            });
+
+            logger.Info("Hello World");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void SetsContentType()
+        {
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(
+                    It.Is<IEnumerable<Message>>(messages => messages.All(o => o.ContentType == "Test"))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.ContentType = "${logger}";
+            });
+
+            logger.Info("Hello World");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void AddsUserProperties()
+        {
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(
+                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Info"))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(
+                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Error"))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.UserProperties.Add(new ServiceBusProperty { Name = "level", Layout = "${level}" });
+            });
+
+            logger.Info("Hello World");
+            logger.Error(new Exception("ya basic"), "foo");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void WhenUserPropertyNameIsEmpty_SkipsProperty()
+        {
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(
+                    It.Is<IEnumerable<Message>>(messages => messages.All(o => !o.UserProperties.Any()))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.UserProperties.Add(new ServiceBusProperty { Name = "", Layout = "${level}" });
+            });
+
+            logger.Info("Hello World");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void SetsMessageProperties()
+        {
+            var expectedEnqueueTime = DateTime.Today.AddDays(1).ToUniversalTime();
+
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(It.Is<IEnumerable<Message>>(messages => messages.All(o =>
+                    o.MessageId == "Info"
+                    && o.TimeToLive == TimeSpan.Parse("00:05:00")
+                    && o.ScheduledEnqueueTimeUtc == expectedEnqueueTime))))
+                .Returns(Task.CompletedTask)
+                .Verifiable();
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.MessageProperties.Add(new ServiceBusProperty { Name = "MessageId", Layout = "${level}" });
+                target.MessageProperties.Add(new ServiceBusProperty { Name = "TimeToLive", Layout = "00:05:00" });
+                target.MessageProperties.Add(new ServiceBusProperty { Name = "ScheduledEnqueueTimeUtc", Layout = expectedEnqueueTime.ToString("o") });
+            });
+
+            logger.Info("Hello World");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void WhenExceptionOccurs_LogsToInternal()
+        {
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(It.IsAny<IEnumerable<Message>>()))
+                .ThrowsAsync(new Exception("foo-ex"))
+                .Verifiable();
+
+            var logger = CreateTestLogger();
+
+            logger.Info("Hello World");
+            logger.Flush();
+
+            MockSenderService.Verify();
+        }
+
+        private TestLogger CreateTestLogger(
+            string loggerName = "Test",
+            Action<T> configureTarget = null,
+            Action<Config.LoggingConfiguration> configureNLog = null
+        )
+        {
+            var logFactory = new LogFactory();
+            var logConfig = new Config.LoggingConfiguration(logFactory);
+
+            logConfig.Variables["ConnectionString"] = "Endpoint=foo-connection-string";
+            logConfig.Variables["EntityPath"] = "baz-topic";
+
+            configureNLog?.Invoke(logConfig);
+
+            var sut = CreateSut();
+
+            sut.ConnectionString = "${var:ConnectionString}";
+            sut.EntityPath = "${var:EntityPath}";
+
+            configureTarget?.Invoke(sut);
+
+            logConfig.AddRuleForAllLevels(sut);
+            logFactory.Configuration = logConfig;
+
+            return new TestLogger(logFactory.GetLogger(loggerName), logFactory);
+        }
+
+        public abstract T CreateSut();
+    }
+}
