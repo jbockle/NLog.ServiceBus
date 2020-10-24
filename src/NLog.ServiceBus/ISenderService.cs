@@ -8,6 +8,6 @@ namespace NLog.ServiceBus
     {
         void Connect(string connectionString, string entityPath);
 
-        Task SendMessagesAsync(IEnumerable<Message> messages);
+        Task SendMessagesAsync(IList<Message> messages);
     }
 }

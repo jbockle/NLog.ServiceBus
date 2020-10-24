@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using NLog.Targets;
@@ -32,9 +31,9 @@ namespace NLog.ServiceBus
             Client = new QueueClient(connectionString, entityPath);
         }
 
-        public Task SendMessagesAsync(IEnumerable<Message> messages)
+        public Task SendMessagesAsync(IList<Message> messages)
         {
-            return Client.SendAsync(messages.ToList());
+            return Client.SendAsync(messages);
         }
     }
 }

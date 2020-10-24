@@ -28,7 +28,7 @@ namespace NLog.ServiceBus.Tests
 
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => Enumerable.SequenceEqual(o.Body, expectedByteArray)))))
+                    It.Is<IList<Message>>(messages => messages.Any(o => Enumerable.SequenceEqual(o.Body, expectedByteArray)))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
 
@@ -60,7 +60,7 @@ namespace NLog.ServiceBus.Tests
             logger.Flush();
 
             MockSenderService
-                .Verify(s => s.SendMessagesAsync(It.Is<IEnumerable<Message>>(messages => messages.Count() == 5)),
+                .Verify(s => s.SendMessagesAsync(It.Is<IList<Message>>(messages => messages.Count() == 5)),
                     Times.Exactly(2));
         }
 
@@ -73,7 +73,7 @@ namespace NLog.ServiceBus.Tests
             var actualCount = 0;
 
             MockSenderService
-                .Setup(s => s.SendMessagesAsync(It.IsAny<IEnumerable<Message>>()))
+                .Setup(s => s.SendMessagesAsync(It.IsAny<IList<Message>>()))
                 .Returns((IEnumerable<Message> messages) =>
                 {
                     actualCount += messages.Count();
@@ -101,7 +101,7 @@ namespace NLog.ServiceBus.Tests
         {
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IEnumerable<Message>>(messages => messages.All(o => o.ContentType == "Test"))))
+                    It.Is<IList<Message>>(messages => messages.All(o => o.ContentType == "Test"))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
 
@@ -121,12 +121,12 @@ namespace NLog.ServiceBus.Tests
         {
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Info"))))
+                    It.Is<IList<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Info"))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IEnumerable<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Error"))))
+                    It.Is<IList<Message>>(messages => messages.Any(o => o.UserProperties["level"].ToString() == "Error"))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
 
@@ -147,7 +147,7 @@ namespace NLog.ServiceBus.Tests
         {
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IEnumerable<Message>>(messages => messages.All(o => !o.UserProperties.Any()))))
+                    It.Is<IList<Message>>(messages => messages.All(o => !o.UserProperties.Any()))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
 
@@ -168,7 +168,7 @@ namespace NLog.ServiceBus.Tests
             var expectedEnqueueTime = DateTime.Today.AddDays(1).ToUniversalTime();
 
             MockSenderService
-                .Setup(s => s.SendMessagesAsync(It.Is<IEnumerable<Message>>(messages => messages.All(o =>
+                .Setup(s => s.SendMessagesAsync(It.Is<IList<Message>>(messages => messages.All(o =>
                     o.MessageId == "Info"
                     && o.TimeToLive == TimeSpan.Parse("00:05:00")
                     && o.ScheduledEnqueueTimeUtc == expectedEnqueueTime))))
@@ -192,7 +192,7 @@ namespace NLog.ServiceBus.Tests
         public void WhenExceptionOccurs_LogsToInternal()
         {
             MockSenderService
-                .Setup(s => s.SendMessagesAsync(It.IsAny<IEnumerable<Message>>()))
+                .Setup(s => s.SendMessagesAsync(It.IsAny<IList<Message>>()))
                 .ThrowsAsync(new Exception("foo-ex"))
                 .Verifiable();
 
