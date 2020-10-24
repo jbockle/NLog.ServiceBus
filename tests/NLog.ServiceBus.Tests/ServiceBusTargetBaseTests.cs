@@ -19,6 +19,8 @@ namespace NLog.ServiceBus.Tests
 
         public Mock<ISenderService> MockSenderService { get; }
 
+        public abstract T CreateSut();
+
         [Fact]
         public void SendsLogEventAsMessage()
         {
@@ -39,6 +41,59 @@ namespace NLog.ServiceBus.Tests
             logger.Flush();
 
             MockSenderService.Verify();
+        }
+
+        [Fact]
+        public void BatchesLogEventsAsMessages()
+        {
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.Layout = "${message}";
+                target.BatchSize = 5;
+            });
+
+            for (var i = 0; i < 10; i++)
+            {
+                logger.Info("msg 1");
+            }
+
+            logger.Flush();
+
+            MockSenderService
+                .Verify(s => s.SendMessagesAsync(It.Is<IEnumerable<Message>>(messages => messages.Count() == 5)),
+                    Times.Exactly(2));
+        }
+
+        [Theory]
+        [InlineData(6)]
+        [InlineData(8)]
+        [InlineData(101)]
+        public void WhenUnEvenBatch_BatchesLogEventsAsMessages(int expectedMessageCount)
+        {
+            var actualCount = 0;
+
+            MockSenderService
+                .Setup(s => s.SendMessagesAsync(It.IsAny<IEnumerable<Message>>()))
+                .Returns((IEnumerable<Message> messages) =>
+                {
+                    actualCount += messages.Count();
+                    return Task.CompletedTask;
+                });
+
+            var logger = CreateTestLogger(configureTarget: target =>
+            {
+                target.Layout = "${message}";
+                target.BatchSize = 5;
+            });
+
+            for (var i = 0; i < expectedMessageCount; i++)
+            {
+                logger.Info($"msg {i}");
+            }
+
+            logger.Flush();
+
+            Assert.Equal(actualCount, expectedMessageCount);
         }
 
         [Fact]
@@ -175,7 +230,5 @@ namespace NLog.ServiceBus.Tests
 
             return new TestLogger(logFactory.GetLogger(loggerName), logFactory);
         }
-
-        public abstract T CreateSut();
     }
 }
