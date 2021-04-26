@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Moq;
-using NLog.Layouts;
 using Xunit;
 
 namespace NLog.ServiceBus.Tests
@@ -214,7 +213,7 @@ namespace NLog.ServiceBus.Tests
         [InlineData("amqpwebsockets", TransportType.AmqpWebSockets)]
         [InlineData("AmqpWebSockets", TransportType.AmqpWebSockets)]
         [InlineData("AmqpWeb", TransportType.Amqp)]
-        public void SetsTransportType(SimpleLayout transportTypeLayout, TransportType expectedTransportType)
+        public void SetsTransportType(string transportTypeLayout, TransportType expectedTransportType)
         {
             var logger = CreateTestLogger(configureTarget: target => target.TransportType = transportTypeLayout);
 
