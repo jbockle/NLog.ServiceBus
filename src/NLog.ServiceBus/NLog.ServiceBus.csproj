@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>NLog.ServiceBus</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>jbockle</Authors>
     <Description>Custom NLog target that sends logs as messages to Service Bus Queues/Topics</Description>
     <RepositoryUrl>https://github.com/jbockle/NLog.ServiceBus</RepositoryUrl>
