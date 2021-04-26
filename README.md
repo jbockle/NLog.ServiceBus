@@ -21,9 +21,11 @@ Besides the below options, all standard target options are available, including 
 
 - `connectionString`<sup>`required`</sup>  
   the service bus connection string
+- `transportType`<sup>`optional`</sup> `Amqp`<sup>_default_</sup> or `AmqpWebSockets`  
+  the service bus connection transport type
 - `entityPath`<sup>`required`</sup>  
   the topic's or queue's path
-- `contentType`<sup>`optional`</sup>  
+- `contentType`<sup>`optional`</sup> `application/octet-stream`<sup>_default_</sup>  
   the message's content type
 - `message-property`<sup>`array` `optional`</sup>  
   set message properties using name/layout
