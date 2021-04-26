@@ -33,6 +33,11 @@ namespace NLog.ServiceBus
         public Layout ConnectionString { get; set; }
 
         /// <summary>
+        /// Gets or sets the service bus transport type (Amqp,AmqpWebSockets)
+        /// </summary>
+        public Layout TransportType { get; set; }
+
+        /// <summary>
         /// Gets or sets the service bus entity path
         /// </summary>
         [RequiredParameter]
@@ -79,10 +84,28 @@ namespace NLog.ServiceBus
             base.InitializeTarget();
 
             var nullEvent = LogEventInfo.CreateNullEvent();
-            var connectionString = RenderLogEvent(ConnectionString, nullEvent);
             var entityPath = RenderLogEvent(EntityPath, nullEvent);
+            var connectionString = GetConnectionString(nullEvent);
 
             Sender.Connect(connectionString, entityPath);
+        }
+
+        internal string GetConnectionString(LogEventInfo logEvent)
+        {
+            var connectionString = RenderLogEvent(ConnectionString, logEvent);
+            var rawTransportType = RenderLogEvent(TransportType, logEvent);
+
+            if (Enum.TryParse(rawTransportType, true, out TransportType transportType))
+            {
+                var connectionStringBuilder = new ServiceBusConnectionStringBuilder(connectionString)
+                {
+                    TransportType = transportType,
+                };
+
+                connectionString = connectionStringBuilder.ToString();
+            }
+
+            return connectionString;
         }
 
         protected override Task WriteAsyncTask(LogEventInfo logEvent, CancellationToken cancellationToken)

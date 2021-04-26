@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Moq;
+using NLog.Layouts;
 using Xunit;
 
 namespace NLog.ServiceBus.Tests
@@ -12,6 +13,8 @@ namespace NLog.ServiceBus.Tests
     public abstract class ServiceBusTargetBaseTests<T>
         where T : ServiceBusTargetBase
     {
+        private LogFactory logFactory = new LogFactory();
+
         protected ServiceBusTargetBaseTests()
         {
             MockSenderService = new Mock<ISenderService>();
@@ -28,7 +31,7 @@ namespace NLog.ServiceBus.Tests
 
             MockSenderService
                 .Setup(s => s.SendMessagesAsync(
-                    It.Is<IList<Message>>(messages => messages.Any(o => Enumerable.SequenceEqual(o.Body, expectedByteArray)))))
+                    It.Is<IList<Message>>(messages => messages.Any(o => o.Body.SequenceEqual(expectedByteArray)))))
                 .Returns(Task.CompletedTask)
                 .Verifiable();
 
@@ -204,16 +207,38 @@ namespace NLog.ServiceBus.Tests
             MockSenderService.Verify();
         }
 
+        [Theory]
+        [InlineData("", TransportType.Amqp)]
+        [InlineData("Amqp", TransportType.Amqp)]
+        [InlineData("amqp", TransportType.Amqp)]
+        [InlineData("amqpwebsockets", TransportType.AmqpWebSockets)]
+        [InlineData("AmqpWebSockets", TransportType.AmqpWebSockets)]
+        [InlineData("AmqpWeb", TransportType.Amqp)]
+        public void SetsTransportType(SimpleLayout transportTypeLayout, TransportType expectedTransportType)
+        {
+            var logger = CreateTestLogger(configureTarget: target => target.TransportType = transportTypeLayout);
+
+            logger.Info("foo");
+
+            var ttarget = (T)logFactory.Configuration.AllTargets.First(target => target is T);
+
+            var connectionString = ttarget.GetConnectionString(LogEventInfo.CreateNullEvent());
+            var actualTransportType = connectionString.Split(';')
+                .Select(kvp => kvp.Split('='))
+                .FirstOrDefault(kvp => kvp[0].Equals("TransportType"))?[1] ?? TransportType.Amqp.ToString();
+
+            Assert.Equal(expectedTransportType.ToString(), actualTransportType);
+        }
+
         private TestLogger CreateTestLogger(
             string loggerName = "Test",
             Action<T> configureTarget = null,
             Action<Config.LoggingConfiguration> configureNLog = null
         )
         {
-            var logFactory = new LogFactory();
             var logConfig = new Config.LoggingConfiguration(logFactory);
 
-            logConfig.Variables["ConnectionString"] = "Endpoint=foo-connection-string";
+            logConfig.Variables["ConnectionString"] = "Endpoint=foo-connection-string.foo.com";
             logConfig.Variables["EntityPath"] = "baz-topic";
 
             configureNLog?.Invoke(logConfig);
